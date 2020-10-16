@@ -1,0 +1,129 @@
+---
+title: "Exploring the BRFSS data"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(car)
+library(calibrate)
+library(gridExtra)
+```
+
+### Load data
+
+```{r load-data}
+load("brfss2013.RData")
+df=data.frame(brfss2013, stringsAsFactors = FALSE)
+i<-sapply(df,is.factor)
+df[i] <- lapply(df[i],as.character)
+df[is.na(df)] <- 0
+df[i] <- lapply(df[i],as.factor)
+
+```
+
+
+
+* * *
+
+## Part 1: Data
+
+
+* * *
+
+## Part 2: Research questions
+
+**Research quesion 1:**
+What influences are Education and Income levels having on ones intake of quality foods (Fruits and Vegetables)? 
+Food distribution systems can be optimised to take care of those requiring expedited assistance through this analysis.
+
+**Research quesion 2:**
+How do different US States fare when it comes to public health distribution systems?
+This can be used to analyse efficacy of each state's public health policy.
+
+**Research quesion 3:**
+Is military service having any long-term impact on ones physical and mental health?
+Years of active duty might lead to alterations in the living styles of military veterans, and analysing these can aid in targetted assistance programs.
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+
+**Research quesion 1:**
+Demographic Dividend
+
+
+
+```{r}
+demographics<- df %>%
+  group_by(X_educag) %>%
+  summarise(mean(X_frutsum),mean(X_vegesum))
+demographics <- demographics[-c(5),]
+demographics2<- df %>%
+  group_by(X_incomg) %>%
+  summarise(mean(X_frutsum),mean(X_vegesum))
+demographics2 <- demographics2[-c(6),]
+p1<- barplot(t(as.matrix(demographics[2:3])), beside = TRUE,main = "Quality of Food consumption",xlab = "Education Status",ylab = "Food items consumed daily", names.arg = as.matrix(demographics$X_educag),las=1,cex.names = 0.53,col=c("green","blue"))
+legend("topleft",c("Fruits","Vegetables"),fill=c("green","blue"))
+p2<- barplot(t(as.matrix(demographics2[2:3])), beside = TRUE,main = "Quality of Food consumption",xlab = "Income Status",ylab = "Food items consumed per day", names.arg = as.matrix(demographics2$X_incomg),las=1,cex.names = 0.53,col=c("green","blue"))
+legend("topleft",c("Fruits","Vegetables"),fill=c("green","blue"))
+```
+
+Both Income and Education levels are directly correlated with average daily consumptions for fruits and vegetables. This can be further extrapolated to check the health statisitics of a particular respondent cohort.
+
+Groups having lower levels of education (did not graduate high school) and less than 15000$ annual income are more susceptible to food shortages, and should be kept under special focus.
+
+
+**Research quesion 2:**
+Geographic Dividend
+
+```{r message=FALSE, paged.print=FALSE}
+library(dplyr)
+geo_1 <- df %>%
+  group_by(X_state,flushot6="Yes") %>%
+  summarise(count1=n())
+geo_2<- df %>%
+  group_by(X_state,flushot6) %>%
+  summarise(count2=n())
+geo_t=merge(geo_1,geo_2,by=c("X_state","flushot6"))
+geo_t$test_range=(geo_t$count2/geo_t$count1)*100
+scatterplot(geo_t$count1,geo_t$test_range,xlab = "Number of respondents",ylab = "Proportions of people who got flu shots (%)", main="Statewise Flu shots" , smooth = FALSE, frame = FALSE, grid = FALSE)
+textxy(geo_t$count1,geo_t$test_range,geo_t$X_state)
+
+```
+
+A sample bias is visible in this test, with Florida and Kansas showing disproportionately high number of respondents. This outlier aspect is visible in the box plot showed along with the x Axis.
+
+Among rest of the sample states, South Dakota, Iowa and Virginia show the highest proportions of sample who had taken a flu shot in the past 6 months. Nebraska and Massachussets also show high vaccination proportions among states with larger samples.
+
+On the other hand, states like California, New Jersey and Georgia show lower vaccination penetration (~35%).
+
+
+**Research quesion 3:**
+Military Services
+```{r}
+veteran <- df %>%
+  group_by(veteran3) %>%
+  summarise(mean(physhlth),mean(menthlth),mean(poorhlth))
+veteran <- veteran[-c(3),]
+fig.hold='hold'
+p1 <- ggplot(veteran,aes(x=veteran3,y=`mean(physhlth)`))+geom_col()+labs(x="", y="Number of days with poor physical health")
+p2 <- ggplot(veteran,aes(x=veteran3,y=`mean(menthlth)`))+geom_col()+labs(x="", y="Number of days with poor mental health")
+p3 <- ggplot(veteran,aes(x=veteran3,y=`mean(poorhlth)`))+geom_col()+labs(x="", y="Number of days with poor health")
+grid.arrange(p1,p2,p3, nrow=1, top="Effect of Military service on mental and physical health", bottom="Are you a veteran?")
+
+```
+
+Veterans when asked for their overall health responded with high number of days when their health was poor over the past 30 days. This trend was more pronounced when they were asked for their physical health. This could have been due to physical injuries and body fatigue sustained over the service period.
+
+When asked around their mental health, veterans did much better than their civilian counterparts.
